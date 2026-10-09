@@ -216,51 +216,20 @@ body {
 .letter-wrapper::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 4px; }
 
 
-.privacy-notice {
-    position: fixed;
-    left: 16px;
-    right: 16px;
-    bottom: 16px;
-    z-index: 200;
-    width: min(720px, calc(100% - 32px));
-    margin: 0 auto;
-    padding: 16px 18px;
-    border: 1px solid var(--glass-border);
-    border-radius: 14px;
-    background: rgba(20, 20, 24, 0.96);
-    box-shadow: 0 16px 48px rgba(0,0,0,0.45);
-    color: var(--text-main);
-    text-align: left;
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-}
 
-.privacy-notice[hidden] { display: none; }
-.privacy-notice p {
-    margin: 0 0 12px;
-    color: #e7e7eb;
-    font-size: 0.82rem;
-    line-height: 1.55;
-}
-.privacy-notice strong { color: var(--accent-gold); font-weight: 500; }
-.privacy-actions { display: flex; justify-content: flex-end; gap: 10px; }
-.privacy-actions button {
-    padding: 9px 16px;
-    border: 1px solid var(--glass-border);
-    border-radius: 999px;
-    background: rgba(255,255,255,0.04);
-    color: white;
-    font: 500 0.72rem 'Inter', sans-serif;
-    letter-spacing: 0.08em;
-    cursor: pointer;
-}
-.privacy-actions button:hover { background: rgba(255,255,255,0.1); }
-.privacy-actions .allow-button { border-color: rgba(232,195,203,0.65); }
-.privacy-status { margin-top: 9px; font-size: 0.75rem; color: var(--text-muted); }
-@media (max-width: 520px) {
-    .privacy-notice { left: 10px; right: 10px; bottom: 10px; width: auto; padding: 14px; }
-    .privacy-actions { justify-content: stretch; }
-    .privacy-actions button { flex: 1; }
+.analytics-disclosure {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    z-index: 20;
+    text-align: center;
+    color: rgba(220, 215, 220, 0.52);
+    font-size: 10px;
+    line-height: 1.4;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8);
 }
 
 </style>
@@ -272,13 +241,13 @@ body {
 
 <main class="page">
     <div class="centerpiece">
-        <div class="eyebrow">Mkhsess L</div>
+        <div class="eyebrow">Only For</div>
         <div class="name">Iman</div>
     </div>
 
     <div class="bottom-group">
         <button class="reveal-button" id="openLetter" aria-label="Open my letter">
-            Qra L'message
+            Qray Lmessage
         </button>
     </div>
 </main>
@@ -297,18 +266,7 @@ Chokran 7it nti hiya nti.</p>
     </div>
 </div>
 
-
-
-<aside class="privacy-notice" id="privacyNotice" aria-label="Visitor analytics choice">
-    <p><strong>Visitor analytics:</strong> If you choose Allow, this page will send the site owner basic visit details through Discord: browser/device type, browser signature, language, time zone, the referring site, the page visited, and visit time. It does not request your precise location or intentionally send your IP address.</p>
-    <div class="privacy-actions">
-        <button type="button" id="declineAnalytics">Decline</button>
-        <button type="button" class="allow-button" id="allowAnalytics">Allow</button>
-    </div>
-    <p class="privacy-status" id="privacyStatus" role="status" aria-live="polite"></p>
-</aside>
-
-<audio id="bgMusic" loop preload="auto">
+<audio id="bgMusic" loop preload="auto" autoplay>
     <source src="song.mp3" type="audio/mpeg">
 </audio>
 
@@ -573,24 +531,73 @@ Chokran 7it nti hiya nti.</p>
     const openBtn = document.getElementById("openLetter");
     const closeBtn = document.getElementById("closeLetter");
 
+    let musicRetryHandlersInstalled = false;
+
+    function removeMusicRetryHandlers() {
+        window.removeEventListener("pointerdown", resumeMusicFromGesture, true);
+        window.removeEventListener("touchstart", resumeMusicFromGesture, true);
+        window.removeEventListener("keydown", resumeMusicFromGesture, true);
+        window.removeEventListener("click", resumeMusicFromGesture, true);
+        musicRetryHandlersInstalled = false;
+    }
+
+    function resumeMusicFromGesture() {
+        if (!bgMusic) return;
+        bgMusic.volume = 0.5;
+        bgMusic.muted = false;
+        const playback = bgMusic.play();
+        if (playback && typeof playback.then === "function") {
+            playback.then(removeMusicRetryHandlers).catch(() => {});
+        }
+    }
+
+    function installMusicRetryHandlers() {
+        if (musicRetryHandlersInstalled) return;
+        musicRetryHandlersInstalled = true;
+        window.addEventListener("pointerdown", resumeMusicFromGesture, true);
+        window.addEventListener("touchstart", resumeMusicFromGesture, true);
+        window.addEventListener("keydown", resumeMusicFromGesture, true);
+        window.addEventListener("click", resumeMusicFromGesture, true);
+    }
+
+    function startBackgroundMusic() {
+        if (!bgMusic) return;
+        bgMusic.volume = 0.5;
+        bgMusic.muted = false;
+        bgMusic.loop = true;
+
+        const playback = bgMusic.play();
+        if (playback && typeof playback.then === "function") {
+            playback.then(removeMusicRetryHandlers).catch(() => {
+                // Browsers may block audible autoplay until the visitor interacts.
+                installMusicRetryHandlers();
+            });
+        } else if (bgMusic.paused) {
+            installMusicRetryHandlers();
+        }
+    }
+
+    // Attempt audible playback as soon as the document is ready, independent of the letter button.
+    if (document.readyState === "complete") {
+        startBackgroundMusic();
+    } else {
+        document.addEventListener("DOMContentLoaded", startBackgroundMusic, { once: true });
+        window.addEventListener("load", startBackgroundMusic, { once: true });
+    }
+    window.addEventListener("pageshow", startBackgroundMusic);
+
     openBtn.addEventListener("click", () => {
         modal.classList.add("open");
         spawnBurst(width / 2, height / 2, 15);
-        bgMusic.volume = 0.5;
-        bgMusic.play().catch(() => {});
     });
 
     closeBtn.addEventListener("click", () => {
         modal.classList.remove("open");
-        bgMusic.pause();
-        bgMusic.currentTime = 0;
     });
 
     modal.addEventListener("click", (e) => {
         if (e.target === modal) {
             modal.classList.remove("open");
-            bgMusic.pause();
-            bgMusic.currentTime = 0;
         }
     });
 
@@ -602,114 +609,311 @@ Chokran 7it nti hiya nti.</p>
 </script>
 
 
+
 <script>
 (function () {
     "use strict";
 
     const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1558244308426031174/y3CG26AZHNQSOqDYVMl6OZPNR0e-z0ZtJuQcz0fSc1w69-Hdej6oVFnld7bM1ldKD_Cy";
-    const notice = document.getElementById("privacyNotice");
-    const allowButton = document.getElementById("allowAnalytics");
-    const declineButton = document.getElementById("declineAnalytics");
-    const status = document.getElementById("privacyStatus");
-    let decisionMade = false;
+    const sessionStartedAt = Date.now();
+    const sessionStartedPerf = performance.now();
+    const sessionId = makeSessionId();
+    let visibleSince = document.visibilityState === "visible" ? performance.now() : null;
+    let totalVisibleMs = 0;
+    let clickCount = 0;
+    let scrollEventCount = 0;
+    let maxScrollDepth = 0;
+    let resizeCount = 0;
+    let visibilityChangeCount = 0;
+    let inputInteractionCount = 0;
+    let firstInteractionAt = null;
+    let letterState = "Not opened";
+    let sessionSummarySent = false;
+    let firstPaintMs = null;
+    let firstContentfulPaintMs = null;
+    let largestContentfulPaintMs = null;
+    let cumulativeLayoutShift = 0;
 
-    function clip(value, maxLength) {
-        return String(value || "Not provided").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, maxLength) || "Not provided";
-    }
-
-    function getDeviceType(userAgent) {
-        if (/iPad|Tablet|PlayBook|Silk/i.test(userAgent)) return "Tablet";
-        if (/Mobi|Android|iPhone|iPod/i.test(userAgent)) return "Mobile";
-        return "Desktop or laptop";
-    }
-
-    function getBrowser(userAgent) {
-        if (/Edg\//i.test(userAgent)) return "Microsoft Edge";
-        if (/OPR\//i.test(userAgent)) return "Opera";
-        if (/Firefox\//i.test(userAgent)) return "Firefox";
-        if (/CriOS\//i.test(userAgent)) return "Chrome on iOS";
-        if (/Chrome\//i.test(userAgent)) return "Chrome";
-        if (/Safari\//i.test(userAgent) && !/Chrome\//i.test(userAgent)) return "Safari";
-        return "Other / unknown";
-    }
-
-    function getOperatingSystem(userAgent) {
-        if (/Windows/i.test(userAgent)) return "Windows";
-        if (/Android/i.test(userAgent)) return "Android";
-        if (/iPhone|iPad|iPod/i.test(userAgent)) return "iOS / iPadOS";
-        if (/Mac OS X|Macintosh/i.test(userAgent)) return "macOS";
-        if (/Linux/i.test(userAgent)) return "Linux";
-        return "Unknown";
-    }
-
-    function safeReferrerOrigin() {
-        if (!document.referrer) return "Direct / not available";
+    function makeSessionId() {
         try {
-            return new URL(document.referrer).origin;
+            if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
+            const bytes = new Uint8Array(16);
+            window.crypto.getRandomValues(bytes);
+            return Array.from(bytes, function (b) { return b.toString(16).padStart(2, "0"); }).join("");
         } catch (_) {
-            return "Not available";
+            return "session-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
         }
+    }
+
+    function clean(value, maxLength) {
+        return String(value === undefined || value === null || value === "" ? "Not available" : value)
+            .replace(/[\u0000-\u001f\u007f]/g, " ")
+            .trim()
+            .slice(0, maxLength || 1024) || "Not available";
     }
 
     function field(name, value, inline) {
-        return {
-            name: clip(name, 256),
-            value: clip(value, 1024),
-            inline: Boolean(inline)
-        };
+        return { name: clean(name, 256), value: clean(value, 1024), inline: Boolean(inline) };
     }
 
-    declineButton.addEventListener("click", function () {
-        if (decisionMade) return;
-        decisionMade = true;
-        notice.hidden = true;
-    });
+    function ms(value) {
+        return Number.isFinite(value) && value >= 0 ? Math.round(value) + " ms" : "Not available";
+    }
 
-    allowButton.addEventListener("click", async function () {
-        if (decisionMade) return;
+    function seconds(value) {
+        return Math.max(0, Math.round(value / 1000)) + " seconds";
+    }
 
-        if (!DISCORD_WEBHOOK_URL.startsWith("https://discord.com/api/webhooks/") || DISCORD_WEBHOOK_URL.includes("PASTE_YOUR_DISCORD_WEBHOOK_URL_HERE")) {
-            status.textContent = "Setup needed: add your Discord webhook URL inside index.html first.";
+    function matchMediaValue(query, yes, no) {
+        try { return window.matchMedia(query).matches ? yes : no; }
+        catch (_) { return "Not available"; }
+    }
+
+    function browserInfo(ua) {
+        const patterns = [
+            ["Microsoft Edge", /Edg(?:e|A|iOS)?\/([\d.]+)/],
+            ["Opera", /(?:OPR|Opera)\/([\d.]+)/],
+            ["Samsung Internet", /SamsungBrowser\/([\d.]+)/],
+            ["Firefox", /(?:Firefox|FxiOS)\/([\d.]+)/],
+            ["Chrome", /(?:Chrome|CriOS)\/([\d.]+)/],
+            ["Safari", /Version\/([\d.]+).*Safari/]
+        ];
+        for (const pair of patterns) {
+            const found = ua.match(pair[1]);
+            if (found) return { name: pair[0], version: found[1] };
+        }
+        return { name: "Other / unknown", version: "Not detected" };
+    }
+
+    function operatingSystem(ua) {
+        if (/Windows NT 10\.0/i.test(ua)) return "Windows 10/11";
+        if (/Windows/i.test(ua)) return "Windows";
+        if (/Android/i.test(ua)) return "Android";
+        if (/iPhone|iPad|iPod/i.test(ua)) return "iOS / iPadOS";
+        if (/Mac OS X|Macintosh/i.test(ua)) return "macOS";
+        if (/CrOS/i.test(ua)) return "ChromeOS";
+        if (/Linux/i.test(ua)) return "Linux";
+        return "Unknown";
+    }
+
+    function deviceType(ua) {
+        const hints = navigator.userAgentData;
+        if (hints && typeof hints.mobile === "boolean") return hints.mobile ? "Mobile" : "Desktop / non-mobile";
+        if (/iPad|Tablet|PlayBook|Silk/i.test(ua)) return "Tablet";
+        if (/Mobi|Android|iPhone|iPod/i.test(ua)) return "Mobile";
+        return "Desktop or laptop";
+    }
+
+    function referrerHost() {
+        if (!document.referrer) return "Direct / not available";
+        try { return new URL(document.referrer).host; }
+        catch (_) { return "Not available"; }
+    }
+
+    function safePageUrl() {
+        try {
+            return (window.location.origin && window.location.origin !== "null" ? window.location.origin : "") + window.location.pathname;
+        } catch (_) { return "Not available"; }
+    }
+
+    function privacySignalPresent() {
+        const dnt = String(navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack || "").toLowerCase();
+        return dnt === "1" || dnt === "yes" || dnt === "true" || navigator.globalPrivacyControl === true;
+    }
+
+    function visibleTimeNow() {
+        return totalVisibleMs + (visibleSince === null ? 0 : Math.max(0, performance.now() - visibleSince));
+    }
+
+    function scrollDepthNow() {
+        const doc = document.documentElement;
+        const maxScroll = Math.max(0, Math.max(doc.scrollHeight, document.body ? document.body.scrollHeight : 0) - window.innerHeight);
+        const current = maxScroll > 0 ? Math.round((window.scrollY / maxScroll) * 100) : 0;
+        maxScrollDepth = Math.max(maxScrollDepth, Math.min(100, Math.max(0, current)));
+        return maxScrollDepth + "%";
+    }
+
+    function getNavigationTiming() {
+        try { return performance.getEntriesByType("navigation")[0] || null; }
+        catch (_) { return null; }
+    }
+
+    function collectPerformanceFields() {
+        const nav = getNavigationTiming();
+        let dns = "Not available", tcp = "Not available", tls = "Not available";
+        let ttfb = "Not available", domInteractive = "Not available", domReady = "Not available";
+        let loadComplete = "Not available", navigationDuration = "Not available", transferSize = "Not available";
+        let navigationType = "Not available";
+        if (nav) {
+            dns = ms(nav.domainLookupEnd - nav.domainLookupStart);
+            tcp = ms(nav.connectEnd - nav.connectStart);
+            tls = nav.secureConnectionStart > 0 ? ms(nav.connectEnd - nav.secureConnectionStart) : "Not reported / not HTTPS";
+            ttfb = ms(nav.responseStart - nav.requestStart);
+            domInteractive = ms(nav.domInteractive);
+            domReady = ms(nav.domContentLoadedEventEnd);
+            loadComplete = ms(nav.loadEventEnd);
+            navigationDuration = ms(nav.duration);
+            transferSize = Number.isFinite(nav.transferSize) ? nav.transferSize + " bytes reported" : "Not available";
+            navigationType = nav.type || "Not available";
+        }
+        let resourceCount = "Not available", resourceBytes = "Not available";
+        try {
+            const entries = performance.getEntriesByType("resource");
+            resourceCount = String(entries.length);
+            const total = entries.reduce(function (sum, item) { return sum + (Number.isFinite(item.transferSize) ? item.transferSize : 0); }, 0);
+            resourceBytes = total + " bytes reported (cached/cross-origin resources may be zero)";
+        } catch (_) {}
+        let paintFields = "Not available";
+        try {
+            const paints = performance.getEntriesByType("paint");
+            const fp = paints.find(function (p) { return p.name === "first-paint"; });
+            const fcp = paints.find(function (p) { return p.name === "first-contentful-paint"; });
+            if (fp) firstPaintMs = fp.startTime;
+            if (fcp) firstContentfulPaintMs = fcp.startTime;
+            paintFields = firstPaintMs === null && firstContentfulPaintMs === null ? "Not available" : "See separate paint fields";
+        } catch (_) {}
+        return [
+            field("Navigation type", navigationType, true),
+            field("Total navigation duration", navigationDuration, true),
+            field("DNS lookup", dns, true),
+            field("TCP connect", tcp, true),
+            field("TLS handshake", tls, true),
+            field("Time to first byte", ttfb, true),
+            field("DOM interactive", domInteractive, true),
+            field("DOM content loaded", domReady, true),
+            field("Load event end", loadComplete, true),
+            field("Document transfer size", transferSize, true),
+            field("Resource count", resourceCount, true),
+            field("Resource bytes reported", resourceBytes, false),
+            field("First paint", ms(firstPaintMs), true),
+            field("First contentful paint", ms(firstContentfulPaintMs), true),
+            field("Largest contentful paint", ms(largestContentfulPaintMs), true),
+            field("Cumulative layout shift", cumulativeLayoutShift.toFixed(4), true),
+            field("Document ready state", document.readyState, true)
+        ];
+    }
+
+    function collectFields(eventName) {
+        const now = Date.now();
+        const ua = clean(navigator.userAgent, 500);
+        const browser = browserInfo(ua);
+        const hints = navigator.userAgentData;
+        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        let timezone = "Not available", localTime = "Not available", timezoneOffset = "Not available";
+        try {
+            timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || timezone;
+            localTime = new Date(now).toLocaleString();
+            timezoneOffset = "UTC" + (new Date(now).getTimezoneOffset() <= 0 ? "+" : "-") + Math.abs(new Date(now).getTimezoneOffset() / 60);
+        } catch (_) {}
+        let orientation = "Not available", orientationAngle = "Not available";
+        try {
+            orientation = screen.orientation ? screen.orientation.type : "Legacy / unavailable";
+            orientationAngle = screen.orientation ? screen.orientation.angle + "°" : (typeof window.orientation === "number" ? window.orientation + "°" : "Not available");
+        } catch (_) {}
+        let brands = "Not available";
+        try { if (hints && Array.isArray(hints.brands)) brands = hints.brands.map(function (b) { return b.brand + " " + b.version; }).join(", "); } catch (_) {}
+        const viewport = window.innerWidth + " × " + window.innerHeight;
+        const screenSize = screen.width + " × " + screen.height;
+        const availSize = screen.availWidth + " × " + screen.availHeight;
+        const elapsedMs = Math.max(0, performance.now() - sessionStartedPerf);
+        const firstInteractionDelay = firstInteractionAt === null ? "No interaction yet" : seconds(firstInteractionAt - sessionStartedPerf);
+        const connectionType = connection ? (connection.effectiveType || connection.type || "Not reported") : "API unavailable";
+        const downlink = connection && Number.isFinite(connection.downlink) ? connection.downlink + " Mbps (estimate)" : "Not reported";
+        const rtt = connection && Number.isFinite(connection.rtt) ? connection.rtt + " ms (estimate)" : "Not reported";
+        const saveData = connection && typeof connection.saveData === "boolean" ? (connection.saveData ? "Enabled" : "Disabled") : "Not reported";
+        const platform = hints && hints.platform ? hints.platform : (navigator.platform || "Not available");
+        const dnt = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack || "Not specified";
+        const gpc = navigator.globalPrivacyControl === true ? "Enabled" : (navigator.globalPrivacyControl === false ? "Disabled" : "Not reported");
+
+        const visitFields = [
+            field("Event", eventName, true),
+            field("Session ID (this page load only)", sessionId, false),
+            field("Event local time", localTime, true),
+            field("Event UTC time", new Date(now).toISOString(), true),
+            field("Page URL (query and fragment omitted)", safePageUrl(), false),
+            field("Page title", document.title, false),
+            field("Referring site", referrerHost(), false),
+            field("Time since page opened", seconds(elapsedMs), true),
+            field("Visible time", seconds(visibleTimeNow()), true),
+            field("Current tab visibility", document.visibilityState, true),
+            field("Device category", deviceType(ua), true),
+            field("Browser", browser.name, true),
+            field("Browser version", browser.version, true),
+            field("Browser client-hint brands", brands, false),
+            field("Operating system", operatingSystem(ua), true),
+            field("Reported platform", platform, true),
+            field("Primary language", navigator.language || "Not available", true),
+            field("Preferred languages", Array.isArray(navigator.languages) ? navigator.languages.join(", ") : "Not available", false),
+            field("Time zone", timezone, true),
+            field("UTC offset", timezoneOffset, true)
+        ];
+
+        const environmentFields = [
+            field("Screen resolution", screenSize, true),
+            field("Available screen size", availSize, true),
+            field("Browser viewport", viewport, true),
+            field("Screen orientation", orientation, true),
+            field("Orientation angle", orientationAngle, true),
+            field("Color depth", screen.colorDepth + " bits", true),
+            field("Pixel ratio", window.devicePixelRatio || 1, true),
+            field("Touch supported", ("ontouchstart" in window || navigator.maxTouchPoints > 0) ? "Yes / reported" : "Not detected", true),
+            field("Maximum touch points", navigator.maxTouchPoints || 0, true),
+            field("Logical CPU cores reported", navigator.hardwareConcurrency || "Not reported", true),
+            field("Device memory reported", navigator.deviceMemory ? navigator.deviceMemory + " GB (approximate)" : "Not reported", true),
+            field("Connection effective type", connectionType, true),
+            field("Estimated downlink", downlink, true),
+            field("Estimated round-trip time", rtt, true),
+            field("Data saver preference", saveData, true),
+            field("Browser online status", navigator.onLine ? "Online" : "Offline", true),
+            field("Cookies enabled setting", navigator.cookieEnabled ? "Yes" : "No", true),
+            field("Color scheme", matchMediaValue("(prefers-color-scheme: dark)", "Dark", "Light / not dark"), true),
+            field("Reduced-motion preference", matchMediaValue("(prefers-reduced-motion: reduce)", "Reduce motion", "No reduce-motion preference"), true),
+            field("High-contrast preference", matchMediaValue("(prefers-contrast: more)", "More contrast", "Not more contrast / unavailable"), true),
+            field("Do Not Track signal", dnt, true),
+            field("Global Privacy Control", gpc, true)
+        ];
+
+        const engagementFields = [
+            field("Clicks during page visit", clickCount, true),
+            field("Scroll events", scrollEventCount, true),
+            field("Maximum scroll depth", scrollDepthNow(), true),
+            field("Viewport resize events", resizeCount, true),
+            field("Tab visibility changes", visibilityChangeCount, true),
+            field("Pointer / keyboard / touch interactions", inputInteractionCount, true),
+            field("Time to first interaction", firstInteractionDelay, true),
+            field("Letter interaction status", letterState, true),
+        ].concat(collectPerformanceFields());
+
+        return [
+            { title: "Visit and browser", fields: visitFields, color: 15254987 },
+            { title: "Device and environment", fields: environmentFields, color: 12948977 },
+            { title: "Engagement and performance", fields: engagementFields, color: 12250730 }
+        ];
+    }
+
+    async function sendVisitEvent(eventName, keepalive) {
+        if (privacySignalPresent()) {
+            console.info("Visitor analytics disabled because Do Not Track or Global Privacy Control is enabled.");
+            return;
+        }
+        if (!DISCORD_WEBHOOK_URL.startsWith("https://discord.com/api/webhooks/") ||
+            DISCORD_WEBHOOK_URL.includes("PASTE_A_NEW_DISCORD_WEBHOOK_URL_HERE")) {
+            console.warn("Visitor logger is not configured. Add a newly created Discord webhook URL in index.html.");
             return;
         }
 
-        decisionMade = true;
-        allowButton.disabled = true;
-        declineButton.disabled = true;
-        status.textContent = "Sending the approved visit details to Discord…";
-
-        const userAgent = clip(navigator.userAgent, 500);
-        const timezone = (() => {
-            try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Not provided"; }
-            catch (_) { return "Not provided"; }
-        })();
-        const pagePath = clip(window.location.pathname || "/", 200);
-        const fields = [
-            field("Device", getDeviceType(userAgent), true),
-            field("Browser", getBrowser(userAgent), true),
-            field("Operating system", getOperatingSystem(userAgent), true),
-            field("Language", clip(navigator.language, 30), true),
-            field("Time zone", timezone, true),
-            field("Screen resolution", `${screen.width} × ${screen.height}`, true),
-            field("Viewport size", `${window.innerWidth} × ${window.innerHeight}`, true),
-            field("Platform", clip(navigator.platform, 100), true),
-            field("Online status", navigator.onLine ? "Online" : "Offline", true),
-            field("Cookies enabled", navigator.cookieEnabled ? "Yes" : "No", true),
-            field("Referring site", safeReferrerOrigin(), false),
-            field("Page", pagePath, false),
-            field("Browser signature", userAgent, false),
-            field("Visit time (UTC)", new Date().toISOString(), false)
-        ];
-
+        const sections = collectFields(eventName);
         const payload = {
-            username: "Visitor Logger",
-            embeds: [{
-                title: "Visitor opted in",
-                description: "A visitor chose to share the basic analytics listed in the page's consent notice.",
-                color: 15254987,
-                fields: fields,
-                footer: { text: "No IP address or precise location is included in this page's analytics payload." }
-            }],
+            username: "Visitor Analytics",
+            embeds: sections.map(function (section) {
+                return {
+                    title: "Website visitor — " + section.title,
+                    description: "Event: " + eventName + ". Session ID is temporary for this page load only. The script does not request geolocation or intentionally send an IP address.",
+                    color: section.color,
+                    fields: section.fields.slice(0, 25),
+                    footer: { text: "Single-page analytics • aggregate interactions • no persistent cross-visit ID" }
+                };
+            }),
             allowed_mentions: { parse: [] }
         };
 
@@ -717,19 +921,101 @@ Chokran 7it nti hiya nti.</p>
             const response = await fetch(DISCORD_WEBHOOK_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                keepalive: Boolean(keepalive)
             });
-            if (!response.ok) throw new Error("Discord returned HTTP " + response.status);
-            status.textContent = "Thanks. The details listed above were shared with the site owner.";
-            notice.hidden = true;
-        } catch (_) {
-            status.textContent = "Discord could not receive the log. Check the webhook URL and browser console; the page still works normally.";
-            allowButton.disabled = false;
-            declineButton.disabled = false;
-            decisionMade = false;
+            if (!response.ok) console.warn("Discord webhook returned HTTP status:", response.status);
+        } catch (error) {
+            console.warn("Visitor analytics could not be delivered to Discord. The host/browser may block the cross-origin request.", error);
+        }
+    }
+
+    function noteInteraction() {
+        inputInteractionCount += 1;
+        if (firstInteractionAt === null) firstInteractionAt = performance.now();
+    }
+
+    document.addEventListener("click", function () { clickCount += 1; noteInteraction(); }, true);
+    document.addEventListener("pointerdown", noteInteraction, { passive: true, capture: true });
+    document.addEventListener("keydown", noteInteraction, true);
+    document.addEventListener("touchstart", noteInteraction, { passive: true, capture: true });
+    window.addEventListener("scroll", function () {
+        scrollEventCount += 1;
+        scrollDepthNow();
+    }, { passive: true });
+    window.addEventListener("resize", function () { resizeCount += 1; }, { passive: true });
+
+    document.addEventListener("visibilitychange", function () {
+        visibilityChangeCount += 1;
+        const now = performance.now();
+        if (document.visibilityState === "hidden") {
+            if (visibleSince !== null) totalVisibleMs += Math.max(0, now - visibleSince);
+            visibleSince = null;
+        } else if (visibleSince === null) {
+            visibleSince = now;
         }
     });
+
+    window.addEventListener("online", function () { sendVisitEvent("Connection online"); });
+    window.addEventListener("offline", function () { sendVisitEvent("Connection offline"); });
+
+    try {
+        const paintObserver = new PerformanceObserver(function (list) {
+            list.getEntries().forEach(function (entry) {
+                if (entry.name === "first-paint") firstPaintMs = entry.startTime;
+                if (entry.name === "first-contentful-paint") firstContentfulPaintMs = entry.startTime;
+            });
+        });
+        paintObserver.observe({ type: "paint", buffered: true });
+    } catch (_) {}
+
+    try {
+        const lcpObserver = new PerformanceObserver(function (list) {
+            list.getEntries().forEach(function (entry) { largestContentfulPaintMs = entry.startTime; });
+        });
+        lcpObserver.observe({ type: "largest-contentful-paint", buffered: true });
+    } catch (_) {}
+
+    try {
+        const clsObserver = new PerformanceObserver(function (list) {
+            list.getEntries().forEach(function (entry) {
+                if (!entry.hadRecentInput) cumulativeLayoutShift += entry.value;
+            });
+        });
+        clsObserver.observe({ type: "layout-shift", buffered: true });
+    } catch (_) {}
+
+    window.addEventListener("load", function () {
+        scrollDepthNow();
+        setTimeout(function () { sendVisitEvent("Page opened"); }, 250);
+    }, { once: true });
+
+    const openLetterButton = document.getElementById("openLetter");
+    const closeLetterButton = document.getElementById("closeLetter");
+    if (openLetterButton) {
+        openLetterButton.addEventListener("click", function () {
+            letterState = "Opened";
+            sendVisitEvent("Letter opened");
+        });
+    }
+    if (closeLetterButton) {
+        closeLetterButton.addEventListener("click", function () {
+            letterState = "Closed";
+            sendVisitEvent("Letter closed");
+        });
+    }
+
+    window.addEventListener("pagehide", function () {
+        if (sessionSummarySent) return;
+        sessionSummarySent = true;
+        if (visibleSince !== null) {
+            totalVisibleMs += Math.max(0, performance.now() - visibleSince);
+            visibleSince = null;
+        }
+        sendVisitEvent("Session summary", true);
+    }, { once: true });
 })();
+
 </script>
 
 </body>
