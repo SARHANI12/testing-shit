@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#0a0a0c">
-<title>L'Iman</title>
+<title>TO Iman</title>
 
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap');
@@ -280,6 +280,119 @@ Chokran 7it nti hiya nti.</p>
     const bgCtx = universeCanvas.getContext("2d", { alpha: false }); 
     const bgMusic = document.getElementById("bgMusic");
 
+    let audioContext = null;
+    let audioAnalyser = null;
+    let audioFrequencyData = null;
+    let audioSource = null;
+    let audioGraphConnected = false;
+    let audioSetupPromise = null;
+    let previousBassLevel = 0;
+    let beatPulse = 0;
+    let lastBeatAt = 0;
+    let lastPulseFrameAt = 0;
+
+    function setupAudioAnalysis() {
+        if (!bgMusic) return Promise.resolve(false);
+        // Opening index.html directly (file://) can make a MediaElementAudioSourceNode
+        // output silence because of browser origin protections. Keep native audio playback
+        // untouched in that case; audio-reactive analysis works when hosted over HTTP/HTTPS.
+        if (window.location.protocol === "file:") return Promise.resolve(false);
+        if (window.location.protocol !== "http:" && window.location.protocol !== "https:") {
+            return Promise.resolve(false);
+        }
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return Promise.resolve(false);
+
+        if (audioAnalyser && audioContext) {
+            if (audioContext.state !== "running") {
+                return audioContext.resume().then(() => audioContext.state === "running").catch(() => false);
+            }
+            return Promise.resolve(true);
+        }
+        if (audioSetupPromise) return audioSetupPromise;
+
+        try {
+            if (!audioContext) audioContext = new AudioContextClass();
+        } catch (_) {
+            return Promise.resolve(false);
+        }
+
+        const context = audioContext;
+        audioSetupPromise = (async function () {
+            try {
+                if (context.state !== "running") await context.resume();
+                if (context.state !== "running") return false;
+
+                if (!audioSource) {
+                    audioSource = context.createMediaElementSource(bgMusic);
+                }
+
+                const analyser = context.createAnalyser();
+                analyser.fftSize = 2048;
+                analyser.smoothingTimeConstant = 0.32;
+
+                try {
+                    audioSource.connect(analyser);
+                    analyser.connect(context.destination);
+                    audioAnalyser = analyser;
+                    audioFrequencyData = new Uint8Array(analyser.frequencyBinCount);
+                    audioGraphConnected = true;
+                    return true;
+                } catch (error) {
+                    // Keep audio audible even if analyser routing fails.
+                    try { audioSource.connect(context.destination); audioGraphConnected = true; } catch (_) {}
+                    audioAnalyser = null;
+                    audioFrequencyData = null;
+                    return false;
+                }
+            } catch (error) {
+                // Once routed through MediaElementAudioSourceNode, reconnect it directly
+                // to the speakers on failure so analysis cannot leave the song silent.
+                if (audioSource && !audioGraphConnected) {
+                    try { audioSource.connect(context.destination); audioGraphConnected = true; } catch (_) {}
+                }
+                return false;
+            } finally {
+                audioSetupPromise = null;
+            }
+        })();
+
+        return audioSetupPromise;
+    }
+
+    function getAudioBeatPulse(time) {
+        const frameDelta = lastPulseFrameAt ? Math.min((time - lastPulseFrameAt) / 1000, 0.05) : 0;
+        lastPulseFrameAt = time;
+        beatPulse *= Math.exp(-frameDelta * 9.5);
+
+        if (audioAnalyser && audioFrequencyData && audioContext && audioContext.state === "running" && !bgMusic.paused && !bgMusic.ended) {
+            audioAnalyser.getByteFrequencyData(audioFrequencyData);
+            const hzPerBin = audioContext.sampleRate / audioAnalyser.fftSize;
+            const firstBin = Math.max(1, Math.floor(35 / hzPerBin));
+            const lastBin = Math.min(audioFrequencyData.length - 1, Math.ceil(165 / hzPerBin));
+            let sum = 0;
+            let peak = 0;
+            let count = 0;
+
+            for (let i = firstBin; i <= lastBin; i++) {
+                const level = audioFrequencyData[i] / 255;
+                sum += level;
+                if (level > peak) peak = level;
+                count++;
+            }
+
+            const bassLevel = count ? Math.max(sum / count, peak * 0.58) : 0;
+            const rise = bassLevel - previousBassLevel;
+            if (bassLevel > 0.13 && rise > 0.024 && time - lastBeatAt > 170) {
+                beatPulse = Math.min(0.09, 0.018 + rise * 0.62);
+                lastBeatAt = time;
+            }
+            previousBassLevel = previousBassLevel * 0.62 + bassLevel * 0.38;
+        }
+
+        return beatPulse;
+    }
+
     const PHRASES = [
         "I love you", "Je t'aime", "Te amo", "Ti amo",
         "Seni seviyorum", "Ich liebe dich", "Eu te amo",
@@ -436,7 +549,9 @@ Chokran 7it nti hiya nti.</p>
         const entrance = Math.min(1, elapsed / 3.8);
         const eased = 1 - Math.pow(1 - entrance, 3);
         
-        const pulse = 1 + Math.pow(Math.max(0, Math.sin(time * 0.0025)), 18) * 0.02;
+        const gentlePulse = Math.pow(Math.max(0, Math.sin(time * 0.0025)), 18) * 0.012;
+        const audioPulse = getAudioBeatPulse(time);
+        const pulse = 1 + gentlePulse + audioPulse;
 
         heartCtx.save();
         heartCtx.translate(width / 2, height * 0.48);
@@ -468,7 +583,7 @@ Chokran 7it nti hiya nti.</p>
         }
 
         if (entrance >= 1) {
-            const glowIntensity = 8 + Math.sin(time * 0.002) * 4;
+            const glowIntensity = 8 + Math.sin(time * 0.002) * 4 + audioPulse * 85;
             const outlineScale = heartScale * (1 + Math.sin(time * 0.0025) * 0.005);
 
             heartCtx.beginPath();
@@ -545,10 +660,25 @@ Chokran 7it nti hiya nti.</p>
         if (!bgMusic) return;
         bgMusic.volume = 0.5;
         bgMusic.muted = false;
-        const playback = bgMusic.play();
-        if (playback && typeof playback.then === "function") {
-            playback.then(removeMusicRetryHandlers).catch(() => {});
+        bgMusic.loop = true;
+
+        let playback;
+        try {
+            playback = bgMusic.play();
+        } catch (_) {
+            installMusicRetryHandlers();
+            return;
         }
+
+        const analysis = setupAudioAnalysis();
+        Promise.resolve(playback).then(() => {
+            // Playback succeeding is the priority. Audio analysis is an optional visual effect.
+            // Do not keep retry handlers installed just because analysis is unavailable.
+            removeMusicRetryHandlers();
+            Promise.resolve(analysis).catch(() => {});
+        }).catch(() => {
+            installMusicRetryHandlers();
+        });
     }
 
     function installMusicRetryHandlers() {
@@ -566,19 +696,30 @@ Chokran 7it nti hiya nti.</p>
         bgMusic.muted = false;
         bgMusic.loop = true;
 
-        const playback = bgMusic.play();
-        if (playback && typeof playback.then === "function") {
-            playback.then(removeMusicRetryHandlers).catch(() => {
-                // Browsers may block audible autoplay until the visitor interacts.
-                installMusicRetryHandlers();
-            });
-        } else if (bgMusic.paused) {
+        // Try native audio playback first. Audio analysis is initialized on a user
+        // gesture so a suspended AudioContext can never interrupt ordinary playback.
+        let playback;
+        try {
+            playback = bgMusic.play();
+        } catch (_) {
             installMusicRetryHandlers();
+            return;
         }
+
+        Promise.resolve(playback).then(() => {
+            installMusicRetryHandlers();
+        }).catch(() => {
+            // Browsers commonly block audible autoplay until the first interaction.
+            installMusicRetryHandlers();
+        });
     }
 
-    // Attempt audible playback as soon as the document is ready, independent of the letter button.
-    if (document.readyState === "complete") {
+    bgMusic.addEventListener("error", () => {
+        console.error("Music file failed to load. Check that song.mp3 is beside index.html, the name matches exactly, and the MP3 is served by the website.", bgMusic.error);
+        installMusicRetryHandlers();
+    });
+
+    if (document.readyState === "complete" || document.readyState === "interactive") {
         startBackgroundMusic();
     } else {
         document.addEventListener("DOMContentLoaded", startBackgroundMusic, { once: true });
