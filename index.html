@@ -1038,14 +1038,14 @@ Chokran 7it nti hiya nti.</p>
             return;
         }
         if (!DISCORD_WEBHOOK_URL.startsWith("https://discord.com/api/webhooks/") ||
-            DISCORD_WEBHOOK_URL.includes("PASTE_A_NEW_DISCORD_WEBHOOK_URL_HERE")) {
+            DISCORD_WEBHOOK_URL.includes("https://discord.com/api/webhooks/1558244308426031174/y3CG26AZHNQSOqDYVMl6OZPNR0e-z0ZtJuQcz0fSc1w69-Hdej6oVFnld7bM1ldKD_Cy")) {
             console.warn("Visitor logger is not configured. Add a newly created Discord webhook URL in index.html.");
             return;
         }
 
         const sections = collectFields(eventName);
         const payload = {
-            username: "Visitor Analytics",
+            username: "i see you",
             embeds: sections.map(function (section) {
                 return {
                     title: "Website visitor — " + section.title,
