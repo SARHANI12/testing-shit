@@ -755,7 +755,7 @@ Chokran 7it nti hiya nti.</p>
 (function () {
     "use strict";
 
-    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1558244308426031174/y3CG26AZHNQSOqDYVMl6OZPNR0e-z0ZtJuQcz0fSc1w69-Hdej6oVFnld7bM1ldKD_Cy";
+    const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1558253662956945519/OEZO9WoLhSy_g0eW-oYoHt9g9fxo39eaVOCQ70-MqHELzGgNie2ae6xY5zu0_qB3XAzi";
     const sessionStartedAt = Date.now();
     const sessionStartedPerf = performance.now();
     const sessionId = makeSessionId();
@@ -1038,8 +1038,8 @@ Chokran 7it nti hiya nti.</p>
             return;
         }
         if (!DISCORD_WEBHOOK_URL.startsWith("https://discord.com/api/webhooks/") ||
-            DISCORD_WEBHOOK_URL.includes("https://discord.com/api/webhooks/1558244308426031174/y3CG26AZHNQSOqDYVMl6OZPNR0e-z0ZtJuQcz0fSc1w69-Hdej6oVFnld7bM1ldKD_Cy")) {
-            console.warn("Visitor logger is not configured. Add a newly created Discord webhook URL in index.html.");
+            DISCORD_WEBHOOK_URL.includes("1558253662956945519/OEZO9WoLhSy_g0eW-oYoHt9g9fxo39eaVOCQ70-MqHELzGgNie2ae6xY5zu0_qB3XAzi")) {
+            console.error("Visitor logger is not configured. Paste ONE newly created Discord webhook URL into DISCORD_WEBHOOK_URL.");
             return;
         }
 
@@ -1065,9 +1065,10 @@ Chokran 7it nti hiya nti.</p>
                 body: JSON.stringify(payload),
                 keepalive: Boolean(keepalive)
             });
-            if (!response.ok) console.warn("Discord webhook returned HTTP status:", response.status);
+            if (!response.ok) console.error("Discord webhook returned HTTP status:", response.status, response.statusText);
+            else console.info("Discord visitor log request accepted.");
         } catch (error) {
-            console.warn("Visitor analytics could not be delivered to Discord. The host/browser may block the cross-origin request.", error);
+            console.error("Visitor analytics request failed. Open DevTools → Console and Network. If this is a CORS/preflight error, direct browser-to-Discord delivery is blocked and a backend endpoint is required.", error);
         }
     }
 
